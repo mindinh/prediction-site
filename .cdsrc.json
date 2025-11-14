@@ -1,0 +1,27 @@
+{
+    "server": {
+        "port": 4004
+    },
+    "build": {
+        "target": ".",
+        "tasks": [
+            {
+                "for": "node-cf"
+            },
+            {
+                "for": "mtx",
+                "src": ".",
+                "dest": "mtx-sidecar"
+            },
+            {
+                "for": "hana"
+            }
+        ]
+    },
+    "hana": {
+        "deploy-format": "hdbtable"
+    },
+    "odata": {
+        "version": "v4"
+    }
+}

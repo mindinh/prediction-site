@@ -1,0 +1,197 @@
+_schema-version: 3.3.0
+ID: cnma_prediction_site
+version: 1.0.0
+description: "A simple CAP project."
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci 
+        - npx cds build --production
+modules:
+  # ------------------------------------------------------------
+  # (2) SERVICE MODULE
+  # ------------------------------------------------------------
+  - name: cnma_prediction_site-srv
+    type: nodejs
+    path: .
+    parameters:
+      disk-quota: 1024M
+      memory: 1024M
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: custom
+      commands:
+        - npm install --production
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: cnma_prediction_site-db
+      - name: cnma_prediction_site_destination
+
+  - name: cnma_prediction_site-db-deployer
+    type: hdb
+    path: db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: cnma_prediction_site-db
+    
+  # ------------------------------------------------------------
+  # (3) UI MODULE
+  # ------------------------------------------------------------
+  # - name: cnma_prediction_site_ui
+  #   type: html5
+  #   path: cnma_prediction_site_ui
+  #   requires:
+  #     - name: cnma_prediction_site_destination
+  #     - name: cnma_prediction_site_html5_host
+  #       parameters:
+  #         content-target: true
+
+  # ------------------------------------------------------------
+  # (4) UI DEPLOYER MODULE
+  # ------------------------------------------------------------
+  # - name: cnma_prediction_site_ui_deployer
+  #   type: com.sap.application.content
+  #   path: cnma_prediction_site_ui
+  #   requires:
+  #     - name: cnma_prediction_site_ui
+  #     - name: cnma_prediction_site_html5_host
+  #       parameters:
+  #         content-target: true
+  #   build-parameters:
+  #     build-result: .
+
+
+  
+  # ------------------------------------------------------------
+  # (5) UI REPO REGISTRY MODULE
+  # ------------------------------------------------------------
+  # - name: cnma_prediction_site_destination_content
+  #   type: com.sap.application.content    
+
+  #   requires:
+    # - name: cnma_prediction_site_xsuaa
+    #   parameters:
+    #     service-key:
+    #       name: cnma_prediction_site_xsuaa_key
+
+    # - name: cnma_prediction_site_html5_host
+    #   parameters:
+    #     service-key:
+    #       name: cnma_prediction_site_html5_host_key
+
+    # - name: cnma_prediction_site_destination
+    #   parameters:
+    #     content-target: true   
+
+    # build-parameters:
+    #   no-source: true
+    # parameters:      
+    #   content:
+    #     instance:
+    #       existing_destinations_policy: update                     
+    #       destinations:
+    #       - Name: cnma_prediction_site_html5_dest
+    #         ServiceInstanceName: cnma_prediction_site_html5_host
+    #         ServiceKeyName: cnma_prediction_site_html5_host_key
+    #         sap.cloud.service: cnma.predictionsite  
+              
+          # - Name: cnma_prediction_site_xsuaa_dest
+          #   Authentication: OAuth2UserTokenExchange
+          #   ServiceInstanceName: cnma_prediction_site_xsuaa
+          #   ServiceKeyName: cnma_prediction_site_xsuaa_key
+          #   sap.cloud.service: cnma.predictionsite
+
+  # - name: cnma_prediction_site
+  #   type: approuter.nodejs
+  #   path: app/router
+  #   parameters:
+  #     keep-existing-routes: true
+  #     disk-quota: 1024M
+  #     memory: 1024M
+  #   requires:
+  #     - name: cnma_prediction_site_destination
+  #     - name: srv-api
+  #       group: destinations
+  #       properties:
+  #         name: srv-api # must be used in xs-app.json as well
+  #         url: ~{srv-url}
+  #         forwardAuthToken: true
+  #   provides:
+  #     - name: app-api
+  #       properties:
+  #         app-protocol: ${protocol}
+  #         app-uri: ${default-uri}
+  # - name: cnma_prediction_site-srv
+  #   type: nodejs
+  #   path: srv
+  #   requires:
+  #     - name: cnma_prediction_site-db
+
+resources:
+  # ------------------------------------------------------------
+  # (1) XSUAA RESOURCE
+  # ------------------------------------------------------------
+  # - name: cnma_prediction_site_xsuaa
+  #   # type: com.sap.xs.uaa
+  #   type: org.cloudfoundry.managed-service
+  #   parameters:
+  #     path: ./xs-security.json
+  #     service: xsuaa
+  #     service-plan: application
+
+  # ------------------------------------------------------------
+  # (2) HANA HDI CONTAINER SERVICE INSTANCE
+  # ------------------------------------------------------------
+  - name: cnma_prediction_site-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  
+  # ------------------------------------------------------------
+  # (3) HTML5 APP REPO HOST INSTANCE
+  # ------------------------------------------------------------
+  # - name: cnma_prediction_site_html5_host
+  #   type: org.cloudfoundry.managed-service
+  #   parameters:
+  #     service: html5-apps-repo
+  #     service-plan: app-host
+
+  # ------------------------------------------------------------
+  # (4) DESTINATION INSTANCES
+  # ------------------------------------------------------------
+  - name: cnma_prediction_site_destination
+    type: org.cloudfoundry.managed-service
+    requires:
+      - name: srv-api
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        forwardAuthToken: true
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+        init_data:
+          instance:
+            existing_destinations_policy: ignore
+            destinations:
+              # ------------------------------------------------------------
+              # (4.1) Destination: Sustainability main service
+              # ------------------------------------------------------------
+              - Name: cnma_prediction_site_srv_dest
+                Authentication: NoAuthentication
+                Description: Main Destination
+                ProxyType: Internet
+                Type: HTTP
+                URL: ~{srv-api/srv-url}
+                HTML5.DynamicDestination: true
+                HTML5.ForwardAuthToken: true
+                HTML5.Timeout: 600000

@@ -1,0 +1,45 @@
+{
+  "name": "cnma_prediction_site",
+  "version": "1.0.0",
+  "description": "A simple CAP project.",
+  "dependencies": {
+    "@cap-js/hana": "^2",
+    "@sap/cds": "^9",
+    "express": "^4"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2",
+    "@sap/cds-dk": "^9"
+  },
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "private": true,
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "sqlite",
+        "model": [
+          "db",
+          "srv"
+        ]
+      },
+      "[production]": {
+        "auth": {
+          "kind": "mocked"
+        },
+        "db": {
+          "kind": "hana"
+        }
+      },
+      "hana": {
+        "syntax": "hdi",
+        "deploy-format": "hdbtable",
+        "journal": {
+          "enable-drop": false,
+          "change-mode": "alter"
+        }
+      }
+    }
+  }
+}
